@@ -1,4 +1,4 @@
-# CookieClip IRL Overlay
+# CookieClip IRL Overlay - https://github.com/cookiebaits/CCIrlOverlay 
 
 A lightweight, battery-efficient, client-side browser overlay engineered for the **IRL Pro** Android live streaming app and OBS / PRISM Live Studio.
 
