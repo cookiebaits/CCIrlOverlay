@@ -31,10 +31,9 @@
 <body>
 
   <p class="text-time">Current Time: <span id="clock">Loading...</span></p>
-  <p class="text-geo">&#x1F4CD; <span id="location-weather">Locating...</span></p>
+  <p class="text-geo">&#x1F4CD; <span id="location-weather">Acquiring Location...</span></p>
 
   <script>
-    // List of major US metropolitan anchor cities for rough proximity snapping
     const MAJOR_METROS = [
       { name: "Los Angeles, CA", lat: 34.0522, lon: -118.2437 },
       { name: "Las Vegas, NV", lat: 36.1699, lon: -115.1398 },
@@ -53,7 +52,6 @@
       { name: "New York, NY", lat: 40.7128, lon: -74.0060 }
     ];
 
-    // WMO Weather code mapper
     function getWeatherDesc(code) {
       if (code === 0) return "☀️ Clear";
       if ([1, 2].includes(code)) return "🌤️ Partly Cloudy";
@@ -65,18 +63,16 @@
       return "🌡️";
     }
 
-    // Great-circle distance calculation
     function getDistance(lat1, lon1, lat2, lon2) {
       const R = 6371; // km
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
-    // Find nearest major metro anchor
     function getNearestMetro(lat, lon) {
       let closest = MAJOR_METROS[0];
       let minDistance = Infinity;
@@ -90,53 +86,57 @@
       return closest;
     }
 
-    // Live clock update
     function updateClock() {
       const now = new Date();
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const m = months[now.getMonth()];
       const d = String(now.getDate()).padStart(2, '0');
-      const timeStr = now.toTimeString().split(' ')[0]; // HH:mm:ss
+      const timeStr = now.toTimeString().split(' ')[0];
       document.getElementById('clock').textContent = `${m} ${d}, ${timeStr}`;
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    // 10-minute coarse location & weather fetcher
-    async function updateLocationAndWeather() {
+    async function fetchWeatherForMetro(metro) {
+      try {
+        const weatherRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${metro.lat}&longitude=${metro.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
+        );
+        const weatherData = await weatherRes.json();
+        const temp = Math.round(weatherData.current.temperature_2m);
+        const icon = getWeatherDesc(weatherData.current.weather_code);
+        document.getElementById('location-weather').textContent = `${metro.name} • ${temp}°F ${icon}`;
+      } catch (e) {
+        document.getElementById('location-weather').textContent = `${metro.name}`;
+      }
+    }
+
+    function updateLocationAndWeather() {
       if (!navigator.geolocation) {
-        document.getElementById('location-weather').textContent = "Las Vegas, NV";
+        fetchWeatherForMetro(MAJOR_METROS[0]); // Fallback to Los Angeles
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           const metro = getNearestMetro(lat, lon);
-
-          // Fetch weather for the metro anchor (no API key required)
-          const weatherRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${metro.lat}&longitude=${metro.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
-          );
-          const weatherData = await weatherRes.json();
-          const temp = Math.round(weatherData.current.temperature_2m);
-          const icon = getWeatherDesc(weatherData.current.weather_code);
-
-          document.getElementById('location-weather').textContent = `${metro.name} • ${temp}°F ${icon}`;
-        } catch (e) {
-          document.getElementById('location-weather').textContent = "Las Vegas, NV";
+          fetchWeatherForMetro(metro);
+        },
+        (err) => {
+          // If permission is denied or times out, fallback to Los Angeles, CA instead of Vegas
+          console.warn("Geolocation failed/denied, defaulting to LA:", err.message);
+          fetchWeatherForMetro(MAJOR_METROS[0]);
+        },
+        {
+          enableHighAccuracy: true, // Switched to true to resolve Android WebView cellular location stalls
+          timeout: 10000,           // Wait up to 10 seconds before falling back
+          maximumAge: 600000        // Accept cached location up to 10 minutes
         }
-      }, () => {
-        // Fallback if GPS permissions fail
-        document.getElementById('location-weather').textContent = "Las Vegas, NV";
-      }, {
-        enableHighAccuracy: false, // Low-power, approximate network location
-        maximumAge: 600000        // Cache up to 10 minutes
-      });
+      );
     }
 
-    // Initial update + run every 10 minutes (600,000 ms)
     updateLocationAndWeather();
     setInterval(updateLocationAndWeather, 600000);
   </script>
