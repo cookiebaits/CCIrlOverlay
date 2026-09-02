@@ -31,9 +31,10 @@
 <body>
 
   <p class="text-time">Current Time: <span id="clock">Loading...</span></p>
-  <p class="text-geo">&#x1F4CD; <span id="location-weather">Acquiring Location...</span></p>
+  <p class="text-geo">&#x1F4CD; <span id="location-weather">Detecting...</span></p>
 
   <script>
+    // Major metropolitan anchor centers
     const MAJOR_METROS = [
       { name: "Los Angeles, CA", lat: 34.0522, lon: -118.2437 },
       { name: "Las Vegas, NV", lat: 36.1699, lon: -115.1398 },
@@ -63,6 +64,7 @@
       return "🌡️";
     }
 
+    // Great-circle haversine calculation
     function getDistance(lat1, lon1, lat2, lon2) {
       const R = 6371; // km
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -73,6 +75,7 @@
       return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
+    // Snaps any coordinate to the closest predefined major metro anchor
     function getNearestMetro(lat, lon) {
       let closest = MAJOR_METROS[0];
       let minDistance = Infinity;
@@ -86,6 +89,7 @@
       return closest;
     }
 
+    // 1-second interval clock
     function updateClock() {
       const now = new Date();
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -97,7 +101,8 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    async function fetchWeatherForMetro(metro) {
+    // Fetch weather for the snapped metro center
+    async function displayMetroWeather(metro) {
       try {
         const weatherRes = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${metro.lat}&longitude=${metro.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
@@ -111,9 +116,27 @@
       }
     }
 
+    // Wi-Fi / IP-based location fallback (Zero API keys required)
+    async function resolveViaWiFiOrIP() {
+      try {
+        const res = await fetch("https://ipwho.is/");
+        const data = await res.json();
+        if (data && data.success && data.latitude && data.longitude) {
+          const metro = getNearestMetro(data.latitude, data.longitude);
+          displayMetroWeather(metro);
+          return;
+        }
+      } catch (err) {
+        console.warn("Wi-Fi/IP resolution failed:", err);
+      }
+      // Hard fallback if offline or blocked
+      displayMetroWeather(MAJOR_METROS[0]); // Los Angeles, CA
+    }
+
+    // Primary locator: attempts network geolocation, then falls back to Wi-Fi IP
     function updateLocationAndWeather() {
       if (!navigator.geolocation) {
-        fetchWeatherForMetro(MAJOR_METROS[0]); // Fallback to Los Angeles
+        resolveViaWiFiOrIP();
         return;
       }
 
@@ -122,21 +145,21 @@
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           const metro = getNearestMetro(lat, lon);
-          fetchWeatherForMetro(metro);
+          displayMetroWeather(metro);
         },
         (err) => {
-          // If permission is denied or times out, fallback to Los Angeles, CA instead of Vegas
-          console.warn("Geolocation failed/denied, defaulting to LA:", err.message);
-          fetchWeatherForMetro(MAJOR_METROS[0]);
+          // GPS denied, disabled, or unavailable -> use Wi-Fi/IP network location
+          resolveViaWiFiOrIP();
         },
         {
-          enableHighAccuracy: true, // Switched to true to resolve Android WebView cellular location stalls
-          timeout: 10000,           // Wait up to 10 seconds before falling back
-          maximumAge: 600000        // Accept cached location up to 10 minutes
+          enableHighAccuracy: false, // Relies on Wi-Fi / cellular beacons
+          timeout: 6000,             // 6s timeout before switching to IP/Wi-Fi lookup
+          maximumAge: 600000         // Cache for 10 minutes
         }
       );
     }
 
+    // Initial update + run every 10 minutes
     updateLocationAndWeather();
     setInterval(updateLocationAndWeather, 600000);
   </script>
