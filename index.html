@@ -3,35 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 1920px;
+      height: 1080px;
       margin: 0;
-      padding: 16px;
+      padding: 0;
       background: transparent;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
-    .text-time {
-      font-family: sans-serif;
-      font-size: 69px;
-      font-weight: bold;
-      color: #EFEFFE;
-      margin: 0 0 8px 0;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.85);
+    /* Fixed container positioned at the bottom-left corner */
+    .overlay-container {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: none;
     }
-    .text-geo {
+    .text-time, .text-geo {
       font-family: sans-serif;
       font-size: 69px;
       font-weight: bold;
       color: #EFEFFE;
       margin: 0;
-      text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.85);
+      line-height: 1.15;
+      text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
+      white-space: nowrap;
     }
   </style>
 </head>
 <body>
 
-  <p class="text-time">Current Time: <span id="clock">Loading...</span></p>
-  <p class="text-geo">&#x1F4CD; <span id="location-weather">Detecting...</span></p>
+  <div class="overlay-container">
+    <p class="text-time">Current Time: <span id="clock">Loading...</span></p>
+    <p class="text-geo">&#x1F4CD; <span id="location-weather">Detecting...</span></p>
+  </div>
 
   <script>
     const MAJOR_METROS = [
@@ -96,7 +107,7 @@
       let hours = now.getHours();
       const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
-      hours = hours ? hours : 12; // '0' becomes '12'
+      hours = hours ? hours : 12;
       const hStr = String(hours).padStart(2, '0');
       const minStr = String(now.getMinutes()).padStart(2, '0');
       const secStr = String(now.getSeconds()).padStart(2, '0');
