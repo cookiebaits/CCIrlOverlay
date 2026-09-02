@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      background: transparent;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    .text-time {
+      font-family: sans-serif;
+      font-size: 55px;
+      font-weight: bold;
+      color: #EFEFFE;
+      margin: 0 0 8px 0;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.85);
+    }
+    .text-geo {
+      font-family: sans-serif;
+      font-size: 69px;
+      font-weight: bold;
+      color: #EFEFFE;
+      margin: 0;
+      text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.85);
+    }
+  </style>
+</head>
+<body>
+
+  <p class="text-time">Current Time: <span id="clock">Loading...</span></p>
+  <p class="text-geo">&#x1F4CD; <span id="location-weather">Locating...</span></p>
+
+  <script>
+    // List of major US metropolitan anchor cities for rough proximity snapping
+    const MAJOR_METROS = [
+      { name: "Los Angeles, CA", lat: 34.0522, lon: -118.2437 },
+      { name: "Las Vegas, NV", lat: 36.1699, lon: -115.1398 },
+      { name: "San Diego, CA", lat: 32.7157, lon: -117.1611 },
+      { name: "San Francisco, CA", lat: 37.7749, lon: -122.4194 },
+      { name: "Phoenix, AZ", lat: 33.4484, lon: -112.0740 },
+      { name: "Seattle, WA", lat: 47.6062, lon: -122.3321 },
+      { name: "Portland, OR", lat: 45.5152, lon: -122.6784 },
+      { name: "Denver, CO", lat: 39.7392, lon: -104.9903 },
+      { name: "Dallas, TX", lat: 32.7767, lon: -96.7970 },
+      { name: "Austin, TX", lat: 30.2672, lon: -97.7431 },
+      { name: "Houston, TX", lat: 29.7604, lon: -95.3698 },
+      { name: "Chicago, IL", lat: 41.8781, lon: -87.6298 },
+      { name: "Miami, FL", lat: 25.7617, lon: -80.1918 },
+      { name: "Atlanta, GA", lat: 33.7490, lon: -84.3880 },
+      { name: "New York, NY", lat: 40.7128, lon: -74.0060 }
+    ];
+
+    // WMO Weather code mapper
+    function getWeatherDesc(code) {
+      if (code === 0) return "☀️ Clear";
+      if ([1, 2].includes(code)) return "🌤️ Partly Cloudy";
+      if (code === 3) return "☁️ Overcast";
+      if ([45, 48].includes(code)) return "🌫️ Fog";
+      if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return "🌧️ Rain";
+      if ([71, 73, 75, 85, 86].includes(code)) return "❄️ Snow";
+      if ([95, 96, 99].includes(code)) return "⛈️ Storms";
+      return "🌡️";
+    }
+
+    // Great-circle distance calculation
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    // Find nearest major metro anchor
+    function getNearestMetro(lat, lon) {
+      let closest = MAJOR_METROS[0];
+      let minDistance = Infinity;
+      for (const metro of MAJOR_METROS) {
+        const dist = getDistance(lat, lon, metro.lat, metro.lon);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closest = metro;
+        }
+      }
+      return closest;
+    }
+
+    // Live clock update
+    function updateClock() {
+      const now = new Date();
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const m = months[now.getMonth()];
+      const d = String(now.getDate()).padStart(2, '0');
+      const timeStr = now.toTimeString().split(' ')[0]; // HH:mm:ss
+      document.getElementById('clock').textContent = `${m} ${d}, ${timeStr}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // 10-minute coarse location & weather fetcher
+    async function updateLocationAndWeather() {
+      if (!navigator.geolocation) {
+        document.getElementById('location-weather').textContent = "Las Vegas, NV";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const metro = getNearestMetro(lat, lon);
+
+          // Fetch weather for the metro anchor (no API key required)
+          const weatherRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${metro.lat}&longitude=${metro.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
+          );
+          const weatherData = await weatherRes.json();
+          const temp = Math.round(weatherData.current.temperature_2m);
+          const icon = getWeatherDesc(weatherData.current.weather_code);
+
+          document.getElementById('location-weather').textContent = `${metro.name} • ${temp}°F ${icon}`;
+        } catch (e) {
+          document.getElementById('location-weather').textContent = "Las Vegas, NV";
+        }
+      }, () => {
+        // Fallback if GPS permissions fail
+        document.getElementById('location-weather').textContent = "Las Vegas, NV";
+      }, {
+        enableHighAccuracy: false, // Low-power, approximate network location
+        maximumAge: 600000        // Cache up to 10 minutes
+      });
+    }
+
+    // Initial update + run every 10 minutes (600,000 ms)
+    updateLocationAndWeather();
+    setInterval(updateLocationAndWeather, 600000);
+  </script>
+</body>
+</html>
