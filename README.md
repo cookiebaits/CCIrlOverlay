@@ -10,7 +10,7 @@ It automates location display with built-in **OPSEC / privacy protection**, snap
 ## 🌟 Features
 
 - **Coarse Geo-Fencing & OPSEC:** Snaps approximate GPS coordinates to predefined anchor metropolitan hubs using great-circle haversine calculation. Never leaks precise streets, venues, or suburban neighborhoods on stream.
-- **Zero API Keys Required:** Integrates with [Open-Meteo](https://open-meteo.com/) for real-time weather code mappings and Celsius / Fahrenheit temperatures (defaults to Celsius; configurable via `?unit=F`).
+- **Zero API Keys Required:** Integrates with [Open-Meteo](https://open-meteo.com/) for real-time weather code mappings and Celsius / Fahrenheit temperatures (defaults to Fahrenheit; configurable via `?unit=C`).
 - **Ultra-Low Battery & Data Footprint:** Requests coarse network location (`enableHighAccuracy: false`) with a 10-minute caching lifecycle (`maximumAge: 600000`) and a 10-minute poll interval (`600,000 ms`).
 - **Side-by-Side Bottom Row Display:** Clean, compact bottom row layout presenting weather icon, temperature, city name, condition description, and date/time side-by-side.
 - **Live Accurate Clock:** Smooth 1-second interval timestamp formatted with uppercase day, date, month, year, and 12-hour clock (e.g., `THU, 05 NOV 2026, 02:12 PM`).
